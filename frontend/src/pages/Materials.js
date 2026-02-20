@@ -3,6 +3,10 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
+const exportToCSV = () => {
+  window.open('/api/materials/export/', '_blank');
+};
+
 const Materials = () => {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,11 +83,16 @@ const Materials = () => {
     <div className="fade-in">
       <div className="page-header">
         <h1 className="page-title">📦 Құрылыс материалдары</h1>
-        {isAdmin && (
-          <Link to="/materials/new" className="btn btn-primary">
-            ➕ Материал қосу
-          </Link>
-        )}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button onClick={exportToCSV} className="btn btn-success">
+            📥 Экспорт (CSV)
+          </button>
+          {isAdmin && (
+            <Link to="/materials/new" className="btn btn-primary">
+              ➕ Материал қосу
+            </Link>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSearch} className="search-filter-bar">

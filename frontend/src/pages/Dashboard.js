@@ -25,6 +25,11 @@ const Dashboard = () => {
       });
     } catch (error) {
       console.error('Failed to fetch statistics:', error);
+      // Fallback to empty stats
+      setStats({
+        materials: { total_materials: 0, by_status: {}, by_category: {} },
+        routes: { total_routes: 0, by_status: {} },
+      });
     } finally {
       setLoading(false);
     }
@@ -60,15 +65,25 @@ const Dashboard = () => {
         <div className="stat-card primary">
           <h3>📦 Материалдар</h3>
           <div className="stat-value">{stats.materials?.total_materials || 0}</div>
-          <div className="stat-label">Барлық материалдар</div>
-          {stats.materials?.by_status && (
+          <div className="stat-label">
+            Барлық материалдар
+            {stats.materials?.total_quantity && (
+              <span style={{ display: 'block', fontSize: '14px', marginTop: '5px', color: '#64748b' }}>
+                Жалпы саны: {stats.materials.total_quantity.toLocaleString('kk-KZ')}
+              </span>
+            )}
+          </div>
+          {stats.materials?.by_status && Object.keys(stats.materials.by_status).length > 0 && (
             <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #e2e8f0' }}>
-              {Object.entries(stats.materials.by_status).map(([status, count]) => (
-                <div key={status} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span>{status}:</span>
-                  <span className={`badge badge-${getStatusColor(status)}`}>{count}</span>
-                </div>
-              ))}
+              {Object.entries(stats.materials.by_status).map(([status, data]) => {
+                const count = typeof data === 'object' ? data.count : data;
+                return (
+                  <div key={status} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span>{status}:</span>
+                    <span className={`badge badge-${getStatusColor(status)}`}>{count}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -94,14 +109,25 @@ const Dashboard = () => {
             <h3>📋 Санаттар</h3>
             <div className="stat-value">{Object.keys(stats.materials.by_category).length}</div>
             <div className="stat-label">Материал санаттары</div>
-            {Object.entries(stats.materials.by_category).slice(0, 5).map(([category, count]) => (
-              <div key={category} style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{category}:</span>
-                  <strong>{count}</strong>
+            {Object.entries(stats.materials.by_category).slice(0, 5).map(([category, data]) => {
+              const count = typeof data === 'object' ? data.count : data;
+              return (
+                <div key={category} style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{category}:</span>
+                    <strong>{count}</strong>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        )}
+        
+        {stats.materials?.total_value > 0 && (
+          <div className="stat-card warning">
+            <h3>💰 Жалпы құны</h3>
+            <div className="stat-value">{Math.round(stats.materials.total_value).toLocaleString('kk-KZ')}</div>
+            <div className="stat-label">Тенге</div>
           </div>
         )}
       </div>

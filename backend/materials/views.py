@@ -3,7 +3,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
+from django.db.models import Q, Count, Sum, Avg
+from django.db.models.functions import TruncDate
 from .models import Material, MaterialCategory
 from .serializers import (
     MaterialSerializer,
@@ -72,17 +73,86 @@ class MaterialDetailView(generics.RetrieveUpdateDestroyAPIView):
 def material_statistics(request):
     """Get material statistics"""
     total_materials = Material.objects.count()
+    total_quantity = Material.objects.aggregate(Sum('quantity'))['quantity__sum'] or 0
+    total_value = Material.objects.aggregate(
+        total=Sum('quantity') * Avg('price_per_unit')
+    )['total'] or 0
+    
     by_status = {}
     for status_code, status_name in Material.STATUS_CHOICES:
-        by_status[status_name] = Material.objects.filter(status=status_code).count()
+        count = Material.objects.filter(status=status_code).count()
+        quantity = Material.objects.filter(status=status_code).aggregate(
+            Sum('quantity')
+        )['quantity__sum'] or 0
+        by_status[status_name] = {
+            'count': count,
+            'quantity': float(quantity)
+        }
     
     by_category = {}
-    for category in MaterialCategory.objects.all():
-        by_category[category.name] = Material.objects.filter(category=category).count()
+    for category in MaterialCategory.objects.annotate(
+        material_count=Count('materials'),
+        total_quantity=Sum('materials__quantity')
+    ):
+        by_category[category.name] = {
+            'count': category.material_count,
+            'quantity': float(category.total_quantity or 0)
+        }
+    
+    # Материалдардың күнделікті қосылу статистикасы
+    daily_additions = Material.objects.annotate(
+        date=TruncDate('created_at')
+    ).values('date').annotate(
+        count=Count('id')
+    ).order_by('-date')[:30]
+    
+    # Ең көп материалдары бар санаттар
+    top_categories = MaterialCategory.objects.annotate(
+        material_count=Count('materials')
+    ).order_by('-material_count')[:5]
     
     return Response({
         'total_materials': total_materials,
+        'total_quantity': float(total_quantity),
+        'total_value': float(total_value),
         'by_status': by_status,
         'by_category': by_category,
+        'daily_additions': list(daily_additions),
+        'top_categories': [
+            {'name': cat.name, 'count': cat.material_count}
+            for cat in top_categories
+        ],
     })
 
+
+@api_view(['GET'])
+@permission_classes([IsAdminOrReadOnly])
+def material_export(request):
+    """Export materials to CSV format"""
+    from django.http import HttpResponse
+    import csv
+    
+    materials = Material.objects.select_related('category').all()
+    
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="materials.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'Атауы', 'Санаты', 'Саны', 'Өлшем бірлігі', 
+        'Бағасы', 'Күйі', 'Орналасқан жері', 'Жеткізуші'
+    ])
+    
+    for material in materials:
+        writer.writerow([
+            material.name,
+            material.category.name if material.category else '',
+            material.quantity,
+            material.get_unit_display(),
+            material.price_per_unit or '',
+            material.get_status_display(),
+            material.location or '',
+            material.supplier or '',
+        ])
+    
+    return response

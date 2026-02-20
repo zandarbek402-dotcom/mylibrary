@@ -5,6 +5,7 @@ from .views import (
     MaterialListCreateView,
     MaterialDetailView,
     material_statistics,
+    material_export,
 )
 
 urlpatterns = [
@@ -13,5 +14,6 @@ urlpatterns = [
     path('', MaterialListCreateView.as_view(), name='material-list-create'),
     path('<int:pk>/', MaterialDetailView.as_view(), name='material-detail'),
     path('statistics/', material_statistics, name='material-statistics'),
+    path('export/', material_export, name='material-export'),
 ]
 
